@@ -12,7 +12,7 @@ class IKButtonTheme {
     backgroundColor: IKColors.secondary,
     disabledBackgroundColor: Colors.grey,
     disabledForegroundColor: Colors.grey,
-    side: const BorderSide(color: IKColors.secondary),
+    // side: const BorderSide(color: IKColors.secondary),
     shadowColor: Colors.transparent,
     // padding: const EdgeInsets.symmetric(vertical: 12,horizontal: 25),
     padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 25),
@@ -21,7 +21,7 @@ class IKButtonTheme {
         fontFamily: "Jost",
         color: Colors.white,
         fontWeight: FontWeight.w500),
-    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(0)),
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
   ));
 
   // dark mode button theme
@@ -32,7 +32,7 @@ class IKButtonTheme {
     backgroundColor: IKColors.secondary,
     disabledBackgroundColor: Colors.grey,
     disabledForegroundColor: Colors.grey,
-    side: const BorderSide(color: IKColors.secondary),
+    // side: const BorderSide(color: IKColors.secondary),
     shadowColor: Colors.transparent,
     padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 25),
     textStyle: const TextStyle(

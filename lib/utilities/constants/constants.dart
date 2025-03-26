@@ -1,1 +1,1 @@
-const MAIN_URL = "http://10.0.2.2:5055/";
+const MAIN_URL = "https://jc-backend-4a69.onrender.com";

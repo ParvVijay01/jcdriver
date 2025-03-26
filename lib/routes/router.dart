@@ -10,7 +10,7 @@ class AppRoutes {
   static const String onboarding = '/onboarding';
   static const String signIn = '/signin';
   static const String home = '/home';
-  static const String orderDetails = '/orderScreen';
+  static const String orderDetails = '/orderScreen'; // Ensure this matches the navigation call
 
   static Route<dynamic> generateRoute(RouteSettings settings) {
     switch (settings.name) {
@@ -27,24 +27,24 @@ class AppRoutes {
         return MaterialPageRoute(builder: (_) => Home());
 
       case orderDetails:
-        if (settings.arguments is Map<String, dynamic>) {
+        if (settings.arguments != null && settings.arguments is Map<String, dynamic>) {
           final order = settings.arguments as Map<String, dynamic>;
           return MaterialPageRoute(
             builder: (_) => OrderDetailsScreen(order: order),
           );
         }
-        return _errorRoute(); // Handle missing arguments
+        return _errorRoute("Invalid order details provided.");
 
       default:
-        return _errorRoute(); // Handle unknown routes
+        return _errorRoute("Page not found!");
     }
   }
 
-  static Route<dynamic> _errorRoute() {
+  static Route<dynamic> _errorRoute(String message) {
     return MaterialPageRoute(
       builder: (_) => Scaffold(
         appBar: AppBar(title: const Text("Error")),
-        body: const Center(child: Text("Page not found!")),
+        body: Center(child: Text(message, style: const TextStyle(fontSize: 18))),
       ),
     );
   }
