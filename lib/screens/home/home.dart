@@ -15,6 +15,11 @@ class Home extends StatefulWidget {
 class _HomeState extends State<Home> {
   int _selectedIndex = 0;
   final List<String> _statuses = ["Processing", "Delivered", "Cancelled"];
+  final List<IconData> _icons = [
+    Icons.hourglass_bottom,
+    Icons.check_circle,
+    Icons.cancel
+  ];
   Timer? _timer;
   OrderProvider? orderProvider;
 
@@ -24,12 +29,12 @@ class _HomeState extends State<Home> {
 
     // Delay order fetching after the initial build
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _fetchOrdersAndCheck();
+      fetchOrdersAndCheck();
     });
 
     // Auto-refresh orders every 30 seconds
     _timer = Timer.periodic(const Duration(seconds: 30), (timer) {
-      if (mounted) _fetchOrdersAndCheck();
+      if (mounted) fetchOrdersAndCheck();
     });
   }
 
@@ -49,7 +54,7 @@ class _HomeState extends State<Home> {
     if (!mounted) return;
 
     final overlay = Overlay.of(context);
-    if (overlay == null) return;
+    
 
     final overlayEntry = OverlayEntry(
       builder: (context) => Positioned(
@@ -88,7 +93,7 @@ class _HomeState extends State<Home> {
     });
   }
 
-  void _fetchOrdersAndCheck() async {
+  void fetchOrdersAndCheck() async {
     if (orderProvider == null) return;
 
     int previousOrderCount = orderProvider!.orders.length;
@@ -128,7 +133,7 @@ class _HomeState extends State<Home> {
             icon: const Icon(Icons.logout),
           ),
           IconButton(
-            onPressed: _fetchOrdersAndCheck, // Manual refresh button
+            onPressed: fetchOrdersAndCheck, // Manual refresh button
             icon: const Icon(Icons.refresh),
           ),
         ],
@@ -151,6 +156,11 @@ class _HomeState extends State<Home> {
                             ? Colors.white
                             : Colors.black,
                       ),
+                    ),
+                    avatar: Icon(
+                      _icons[index],
+                      color:
+                          _selectedIndex == index ? Colors.white : Colors.black,
                     ),
                     showCheckmark: false,
                     selected: _selectedIndex == index,

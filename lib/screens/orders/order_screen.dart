@@ -1,12 +1,18 @@
+// ignore_for_file: use_build_context_synchronously, deprecated_member_use
+
 import 'dart:developer';
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:hive/hive.dart';
 import 'package:intl/intl.dart';
 import 'package:jcdriver/utilities/constants/colors.dart';
 import 'package:jcdriver/utilities/constants/constants.dart';
+import 'package:jcdriver/screens/orders/widgets/google_map.dart';
+import 'package:jcdriver/screens/orders/widgets/order_detail_text.dart';
+import 'package:jcdriver/screens/orders/widgets/order_items.dart';
+import 'package:jcdriver/screens/orders/widgets/status_button.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 class OrderDetailsScreen extends StatefulWidget {
   final Map<String, dynamic> order;
@@ -17,60 +23,69 @@ class OrderDetailsScreen extends StatefulWidget {
 }
 
 class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
-  final Dio _dio = Dio();
   final String _baseUrl = "$MAIN_URL/api/rider/update-delevery/";
   bool _isLoading = false;
 
-  Future<void> _updateOrderStatus(String newStatus) async {
-    setState(() => _isLoading = true);
-
+  Future<void> _updateOrderStatus(BuildContext context,
+      Map<String, dynamic> order, String newStatus) async {
+    setState(() {
+      _isLoading = true;
+    });
     try {
-      log("🔄 Updating order...");
+      log("🛠 Updating Order Status...");
+      var box = Hive.box('appBox');
 
-      SharedPreferences prefs = await SharedPreferences.getInstance();
-      String? id = prefs.getString('orderId');
+      await Future.delayed(const Duration(milliseconds: 500));
 
-      log("🔍 Stored User ID: $id"); // Debugging log
+      String? id = box.get('orderId');
 
       if (id == null) {
-        log("❌ User ID is null. Cannot update order.");
+        log("❌ Error: Order ID not found in Hive.");
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text("Error: User ID is missing. Please log in again.")),
+          const SnackBar(
+              content: Text("Order ID not found. Please try again.")),
         );
         return;
       }
 
-      int orderId = widget.order['invoice'];
+      int orderId = order['invoice'];
       String url = "$_baseUrl$orderId/$id/$newStatus";
-      log("🌐 API URL: $url");
 
-      Response response = await _dio.get(url,
+      log("📦 Order ID from Hive: $id");
+      log("🔗 API URL: $url");
+
+      Response response = await Dio().get(url,
           options: Options(headers: {"Content-Type": "application/json"}));
 
-      log("✅ Response Data: ${response.data}");
-
       if (response.statusCode == 200) {
-        setState(() => widget.order['status'] = newStatus);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Order status updated to $newStatus")),
-        );
-        await Future.delayed(const Duration(seconds: 2));
-        if (mounted) Navigator.pop(context, true);
-      } else {
-        log("❌ Unexpected Response: ${response.statusCode} - ${response.data}");
+        order['status'] = newStatus;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text("Error updating status: ${response.statusCode}")),
+            content: Text(newStatus == "true"
+                ? "✅ Order status updated to Delivered"
+                : "❌ Order status updated to Cancelled"),
+          ),
         );
+        await Future.delayed(const Duration(seconds: 2));
+        if (mounted) {
+          Navigator.pop(context, true);
+          
+        }
+        
+      } else {
+        throw Exception("❌ Failed to update status");
       }
     } catch (e) {
-      log("🚨 Error: $e");
+      log("❌ Error: $e");
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("An error occurred while updating status.")),
+        SnackBar(content: Text("Error updating status: $e")),
       );
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -79,7 +94,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     final userInfo = widget.order['user_info'] ?? {};
     final List<dynamic> cart = widget.order['cart'] ?? [];
     final double screenWidth = MediaQuery.of(context).size.width;
-    print("userinfo ---> $userInfo");
+
     return Scaffold(
       appBar: AppBar(title: const Text("Order Details")),
       body: Stack(
@@ -100,26 +115,30 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _orderDetailText(
+                      orderDetailText(
                           "🆔 Order ID: ${widget.order['invoice'] ?? 'N/A'}"),
-                      _orderDetailText(
+                      orderDetailText(
                           "💰 Total Amount: ₹${widget.order['total'] ?? 0}"),
-                      _orderDetailText(
+                      orderDetailText(
                           "📍 Address: ${userInfo['address'] ?? 'N/A'}"),
-                      _orderDetailText(
+                      orderDetailText(
                           "📮 Pincode: ${userInfo['zipCode'] ?? 'N/A'}"),
-                      _orderDetailText("🏙 City: ${userInfo['city'] ?? 'N/A'}"),
+                      orderDetailText("🏙 City: ${userInfo['city'] ?? 'N/A'}"),
                     ],
                   ),
                 ),
                 _statusAndActions(),
-                _orderItems(cart),
+                orderItems(cart),
               ],
             ),
           ),
           if (_isLoading)
-            const Center(
-                child: CircularProgressIndicator(color: IKColors.primary)),
+            Container(
+              color: Colors.black.withOpacity(0.3),
+              child: const Center(
+                child: CircularProgressIndicator(color: IKColors.primary),
+              ),
+            ),
         ],
       ),
     );
@@ -128,6 +147,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   Widget _statusAndActions() {
     final double screenWidth = MediaQuery.of(context).size.width;
     final userInfo = widget.order['user_info'] ?? {};
+
     return SizedBox(
       width: screenWidth < 600 ? screenWidth * 0.9 : 500,
       child: Card(
@@ -149,27 +169,23 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
               widget.order['status'] == 'Processing'
                   ? Row(
                       children: [
-                        FaIcon(FontAwesomeIcons.circleUp),
-                        SizedBox(
-                          width: 5,
-                        ),
-                        Text(
+                        const FaIcon(FontAwesomeIcons.circleUp),
+                        const SizedBox(width: 5),
+                        const Text(
                           "Update order status",
                           style: TextStyle(
-                            color: Colors.black,
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
+                              color: Colors.black,
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold),
                         )
                       ],
                     )
                   : const Text(
                       "📦 Order Status",
                       style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black,
-                      ),
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black),
                     ),
               const SizedBox(height: 10),
               widget.order['status'] == 'Processing'
@@ -179,19 +195,22 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Expanded(
-                              child: _statusButton(
+                              child: statusButton(
                                   "Cancel Order",
                                   Colors.red,
                                   Icons.close,
-                                  () => _updateOrderStatus("false")),
+                                  () => _updateOrderStatus(
+                                      context, widget.order, "false")),
                             ),
                             const SizedBox(width: 10),
                             Expanded(
-                              child: _statusButton(
-                                  "Mark Delivered",
-                                  Colors.green,
-                                  Icons.check,
-                                  () => _updateOrderStatus("true")),
+                              child: statusButton(
+                                  "Mark Delivered", Colors.green, Icons.check,
+                                  () async {
+                                await storeId();
+                                _updateOrderStatus(
+                                    context, widget.order, "true");
+                              }),
                             ),
                           ],
                         ),
@@ -203,7 +222,6 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                               if (userInfo.containsKey('location') &&
                                   userInfo['location'] != null) {
                                 openGoogleMaps(url: userInfo['location']);
-                                log("User Info Location: ${userInfo['location']}");
                               } else {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
@@ -224,11 +242,11 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                           ),
                         )
                       ],
-                    ) //,
+                    )
                   : Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _orderDetailText(
+                        orderDetailText(
                             "Current Status: ${widget.order['status']}"),
                         _dateText(
                             widget.order['status'], widget.order['updatedAt'])
@@ -240,83 +258,44 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
       ),
     );
   }
+}
 
-  Widget _statusButton(
-      String text, Color color, IconData icon, VoidCallback onPressed) {
-    return ElevatedButton.icon(
-      onPressed: onPressed,
-      icon: Icon(icon, size: 20, color: Colors.white),
-      label: Text(text,
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: color,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-        padding: const EdgeInsets.symmetric(vertical: 12),
-      ),
-    );
+Future<void> storeId() async {
+  try {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    var box = Hive.box('appBox'); // Open Hive box
+    String? riderId = prefs.getString('riderId'); // Retrieve riderId
+
+    if (riderId == null) {
+      log("❌ Rider ID not found");
+      return;
+    }
+
+    final response =
+        await Dio().get("$MAIN_URL/api/rider/pending-deliveries/$riderId");
+
+    if (response.statusCode == 200) {
+      log("📦 Full Response Data: ${response.data}");
+
+      if (response.data is List && response.data.isNotEmpty) {
+        String? orderId = response.data[0]['_id'];
+        log("🔍 Extracted Order ID: $orderId");
+
+        if (orderId != null) {
+          await box.put('orderId', orderId);
+          log("✅ Order ID stored successfully in Hive.");
+        } else {
+          log("❌ '_id' field not found in response.");
+        }
+      } else {
+        log("⚠️ API response format is incorrect or empty.");
+      }
+    } else {
+      log("❌ Failed to fetch data: ${response.statusCode}");
+    }
+  } catch (e) {
+    log("❌ storeId Error: $e");
   }
-
-  Widget _orderItems(List<dynamic> cart) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text("Items:",
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 10),
-        ListView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: cart.length,
-          itemBuilder: (context, index) {
-            final item = cart[index];
-            return _orderItemCard(item);
-          },
-        ),
-      ],
-    );
-  }
-
-  Widget _orderItemCard(Map<String, dynamic> item) {
-    final String title = item['title'] ?? 'Unknown Item';
-    final List<String> images = (item['image'] is List)
-        ? List<String>.from(item['image'])
-        : [item['image'] ?? ''];
-    final double price = (item['price'] ?? 0).toDouble();
-    final int quantity = item['quantity'] ?? 1;
-    return Card(
-      elevation: 3,
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      child: ListTile(
-        leading: ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: images.isNotEmpty && images.first.isNotEmpty
-              ? Image.network(images.first,
-                  width: 60, height: 60, fit: BoxFit.cover)
-              : _noImagePlaceholder(),
-        ),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text("₹$price x $quantity"),
-        trailing: Text("Total: ₹${price * quantity}",
-            style: const TextStyle(fontWeight: FontWeight.bold)),
-      ),
-    );
-  }
-
-  Widget _orderDetailText(String text) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 5),
-        child: Text(text,
-            style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w500,
-                color: Colors.black87)),
-      );
-
-  Widget _noImagePlaceholder() => Container(
-      width: 60,
-      height: 60,
-      color: Colors.grey.shade300,
-      child:
-          const Icon(Icons.image_not_supported, size: 40, color: Colors.grey));
 }
 
 Widget _dateText(String status, String updatedAt) {
@@ -345,26 +324,4 @@ Widget _dateText(String status, String updatedAt) {
       ),
     ),
   );
-}
-
-void openGoogleMaps({
-  required String? url,
-}) async {
-  String googleMapsUrl;
-
-  if (url != null) {
-    // Case 1: Open the direct Google Maps link from backend
-    googleMapsUrl = url;
-  } else {
-    // Invalid case
-
-    return;
-  }
-
-  Uri uri = Uri.parse(googleMapsUrl);
-  if (await canLaunchUrl(uri)) {
-    await launchUrl(uri, mode: LaunchMode.externalApplication);
-  } else {
-    print("Could not launch Google Maps");
-  }
 }

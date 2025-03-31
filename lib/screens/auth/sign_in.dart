@@ -1,3 +1,5 @@
+// ignore_for_file: use_build_context_synchronously
+
 import 'package:flutter/material.dart';
 import 'package:jcdriver/components/textfields/signin_textfield.dart';
 import 'package:jcdriver/data/providers/driver_provider.dart';

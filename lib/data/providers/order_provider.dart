@@ -2,6 +2,7 @@ import 'dart:developer';
 
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
+import 'package:hive/hive.dart';
 import 'package:jcdriver/utilities/constants/constants.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -40,7 +41,7 @@ class OrderProvider extends ChangeNotifier {
             .toList();
       }
     } catch (e) {
-      print("Error fetching orders: $e");
+      rethrow;
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -49,40 +50,37 @@ class OrderProvider extends ChangeNotifier {
 
   Future<void> storeId() async {
     try {
-      SharedPreferences prefs = await SharedPreferences.getInstance();
-      String? riderId = prefs.getString('riderId');
+      var box = await Hive.openBox('appBox'); // Ensure the box is opened
+      String? riderId = box.get('riderId'); // Retrieve riderId
 
       if (riderId == null) {
-        log("Rider ID not found");
-        _orders = [];
-        _isLoading = false;
-        notifyListeners();
+        log("Error: Rider ID not found in Hive.");
         return;
       }
+      log("Rider ID: $riderId");
 
-      final response = await dio.get("/api/rider/pending-deliveries/$riderId");
+      final response =
+          await Dio().get("/api/rider/pending-deliveries/$riderId");
 
       if (response.statusCode == 200) {
         log("Response Data: ${response.data}");
 
         if (response.data is List && response.data.isNotEmpty) {
-          // Extract _id from the first item in the list
           String? orderId = response.data[0]['_id'];
-
           if (orderId != null) {
-            await prefs.setString('orderId', orderId); // Store order ID
-            log("Order _id stored: $orderId");
+            await box.put('orderId', orderId); // Store order ID in Hive
+            log("✅ Order ID stored in Hive: $orderId");
           } else {
-            log("Error: '_id' not found in response.");
+            log("❌ Error: '_id' not found in response.");
           }
         } else {
-          log("Unexpected response format or empty list.");
+          log("❌ Error: Unexpected response format or empty list.");
         }
       } else {
-        log("Failed to fetch data: ${response.statusCode}");
+        log("❌ Failed to fetch data. Status Code: ${response.statusCode}");
       }
     } catch (e) {
-      log("storeId Error: $e");
+      log("❌ storeId Error: $e");
     }
   }
 }
